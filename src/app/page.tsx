@@ -1,29 +1,45 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ShieldAlert, Cpu, Terminal, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Cpu, CheckCircle2, AlertTriangle } from 'lucide-react';
+
+const POLICIES = ['전면 지원', '비군사적 지원(인도적·경제)', '중립 선언과 중재 시도', '지원 거부와 교역 유지'];
+const LABELS: Record<string, string> = {
+  security: '안보',
+  economy: '경제',
+  reputation: '국제 평판',
+  public_support: '여론 지지',
+};
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [country, setCountry] = useState('하란국');
+  const [policy, setPolicy] = useState(2);
+  const [reason, setReason] = useState('중립을 지키며 중재해 인명 피해를 줄이고 교역도 지키고 싶습니다.');
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleRunSimulation = async () => {
+  const run = async () => {
     setLoading(true);
-    setResult(null);
+    setData(null);
+    setError(null);
     try {
-      const response = await fetch('/api/simulate', {
+      const res = await fetch('/api/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'NSC Simulator Test Run' }),
+        body: JSON.stringify({ country, policy, reason }),
       });
-      const data = await response.json();
-      setResult(data.output || '시뮬레이션이 성공적으로 완료되었습니다.');
-    } catch (error) {
-      setResult('시뮬레이션 실행 중 오류가 발생했습니다.');
+      const json = await res.json();
+      if (!res.ok) setError(json.error || `서버 오류 (${res.status})`);
+      else setData(json);
+    } catch {
+      setError('서버에 연결하지 못했습니다.');
     } finally {
       setLoading(false);
     }
   };
+
+  const sim = data?.simulation;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
@@ -38,13 +54,32 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="border-t border-slate-800 pt-6 mb-6">
-          <p className="text-slate-300 leading-relaxed mb-4">
-            데스크톱 환경 설정이 완료되었습니다. 아래 버튼을 눌러 AI 시뮬레이터 시스템 연동 테스트를 시작해 보세요.
-          </p>
-          
+        <div className="border-t border-slate-800 pt-6 mb-6 space-y-3">
+          <input
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            maxLength={8}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+            placeholder="국가 이름"
+          />
+          <select
+            value={policy}
+            onChange={(e) => setPolicy(Number(e.target.value))}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+          >
+            {POLICIES.map((p, i) => (
+              <option key={i} value={i}>{p}</option>
+            ))}
+          </select>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+            placeholder="정책을 선택한 이유"
+          />
           <button
-            onClick={handleRunSimulation}
+            onClick={run}
             disabled={loading}
             className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-medium rounded-xl transition duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20"
           >
@@ -53,13 +88,31 @@ export default function Home() {
           </button>
         </div>
 
-        {result && (
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mt-6">
-            <div className="flex items-center space-x-2 text-emerald-400 mb-2">
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-semibold text-sm">실행 결과</span>
+        {error && (
+          <div className="bg-slate-950 border border-red-900 rounded-xl p-4 mt-6">
+            <div className="flex items-center space-x-2 text-red-400 mb-2">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="font-semibold text-sm">오류</span>
             </div>
-            <p className="text-sm text-slate-300 whitespace-pre-wrap font-mono">{result}</p>
+            <p className="text-sm text-slate-300 whitespace-pre-wrap">{error}</p>
+          </div>
+        )}
+
+        {sim && (
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mt-6 space-y-3 text-sm">
+            <div className="flex items-center space-x-2 text-emerald-400">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-semibold">
+                {data.source === 'ai' ? `AI 생성 결과 (${data.model})` : '대체본 결과 (AI 호출 실패 또는 대체본 모드)'}
+              </span>
+            </div>
+            <p><b>{sim.ally_statement.speaker}</b>: {sim.ally_statement.text}</p>
+            <p><b>{sim.trade_response.speaker}</b>: {sim.trade_response.text}</p>
+            <p><b>{sim.news_article.headline}</b><br />{sim.news_article.body}</p>
+            <p className="text-amber-300">속보: {sim.ticker.join(' / ')}</p>
+            <p className="text-slate-400">
+              지표 변화: {Object.entries(sim.indicator_deltas).map(([k, v]) => `${LABELS[k]} ${Number(v) > 0 ? '+' : ''}${v}`).join(', ')}
+            </p>
           </div>
         )}
       </div>

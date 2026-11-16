@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 빌드 시 엄격한 깐깐한 ESLint 검사를 일시적으로 무시합니다
+  // 빌드 시 ESLint 에러로 인해 배포가 중단되는 것을 방지
   eslint: {
     ignoreDuringBuilds: true,
   },

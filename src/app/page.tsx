@@ -1,120 +1,55 @@
-'use client';
+import Link from 'next/link';
 
-import React, { useState } from 'react';
-import { Sparkles, Cpu, CheckCircle2, AlertTriangle } from 'lucide-react';
-
-const POLICIES = ['전면 지원', '비군사적 지원(인도적·경제)', '중립 선언과 중재 시도', '지원 거부와 교역 유지'];
-const LABELS: Record<string, string> = {
-  security: '안보',
-  economy: '경제',
-  reputation: '국제 평판',
-  public_support: '여론 지지',
-};
-
-export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [country, setCountry] = useState('하란국');
-  const [policy, setPolicy] = useState(2);
-  const [reason, setReason] = useState('중립을 지키며 중재해 인명 피해를 줄이고 교역도 지키고 싶습니다.');
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = async () => {
-    setLoading(true);
-    setData(null);
-    setError(null);
-    try {
-      const res = await fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country, policy, reason }),
-      });
-      const json = await res.json();
-      if (!res.ok) setError(json.error || `서버 오류 (${res.status})`);
-      else setData(json);
-    } catch {
-      setError('서버에 연결하지 못했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sim = data?.simulation;
-
+export default function HomePage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
-      <div className="max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl">
-            <Cpu className="w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">NSC Simulator</h1>
-            <p className="text-sm text-slate-400">Gemini & Firebase 기반 시뮬레이터 환경</p>
-          </div>
+    <main className="min-h-screen relative flex items-center justify-center p-4 md:p-8 overflow-hidden bg-[#0F172A]">
+      {/* 1. 배경 일러스트 레이어 (화면 크기에 맞게 여백을 지키고 잘림을 방지하기 위한 object/bg 설정) */}
+      <div
+        className="absolute inset-0 z-0 bg-cover bg-center md:bg-[center_top] bg-no-repeat transition-all duration-500"
+        style={{
+          backgroundImage: `url('/background.png')`,
+        }}
+      />
+
+      {/* 2. 어두운 오버레이: 배경을 살리면서 텍스트가 묻히지 않게 조율된 은은한 그라데이션 */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-slate-950/85 via-slate-950/40 to-slate-900/15" />
+
+      {/* 3. 화면 중앙에 위치한 콘텐츠 카드 (반응형 패딩 및 최대 너비 보정) */}
+      <div className="relative z-20 max-w-xl w-full bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl text-center space-y-6 sm:space-y-8 my-auto">
+        <div className="space-y-3 sm:space-y-4">
+          <span className="inline-block px-3 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] sm:text-xs font-black tracking-wider uppercase">
+            한국사 × 현대 사회와 윤리 융합 수업
+          </span>
+
+          {/* md 화면 이상에서 줄바꿈 없이 한 줄에, 모바일에서는 유연하게 */}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white md:whitespace-nowrap drop-shadow">
+            다시 태어나 보니, 내가 <span className="text-teal-400">대통령?!</span>
+          </h1>
+
+          <p className="text-xs sm:text-sm md:text-base font-bold text-slate-200 leading-relaxed max-w-md mx-auto">
+            동맹의 신의(<span className="text-teal-300">프렌디아</span>)와 자국의 실리(<span className="text-indigo-300">그랜</span>)가 충돌할 때,<br className="hidden sm:inline" />
+            대통령으로서 어떤 외교 노선을 선택하시겠습니까?
+          </p>
         </div>
 
-        <div className="border-t border-slate-800 pt-6 mb-6 space-y-3">
-          <input
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            maxLength={8}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
-            placeholder="국가 이름"
-          />
-          <select
-            value={policy}
-            onChange={(e) => setPolicy(Number(e.target.value))}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
+        {/* 4. 버튼 영역 (모바일 1열, 태블릿 이상 2열 대응) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1 sm:pt-2">
+          <Link
+            href="/join"
+            className="group p-4 sm:p-5 rounded-2xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-black text-base sm:text-lg shadow-lg transition duration-200 flex flex-col items-center justify-center gap-1"
           >
-            {POLICIES.map((p, i) => (
-              <option key={i} value={i}>{p}</option>
-            ))}
-          </select>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"
-            placeholder="정책을 선택한 이유"
-          />
-          <button
-            onClick={run}
-            disabled={loading}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-medium rounded-xl transition duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20"
+            <span className="flex items-center gap-1">🎖️ 모둠 대통령 입장</span>
+            <span className="text-[10px] sm:text-xs font-normal text-teal-100 group-hover:text-white transition">QR · 세션 코드로 참여</span>
+          </Link>
+
+          <Link
+            href="/teacher"
+            className="group p-4 sm:p-5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-100 font-black text-base sm:text-lg transition duration-200 flex flex-col items-center justify-center gap-1"
           >
-            <Sparkles className="w-5 h-5" />
-            <span>{loading ? '시뮬레이션 실행 중...' : '시뮬레이터 테스트 실행'}</span>
-          </button>
+            <span>🧑‍🏫 교사 통제실</span>
+            <span className="text-[10px] sm:text-xs font-normal text-slate-400 group-hover:text-slate-300 transition">세션 개설 및 타이머 제어</span>
+          </Link>
         </div>
-
-        {error && (
-          <div className="bg-slate-950 border border-red-900 rounded-xl p-4 mt-6">
-            <div className="flex items-center space-x-2 text-red-400 mb-2">
-              <AlertTriangle className="w-5 h-5" />
-              <span className="font-semibold text-sm">오류</span>
-            </div>
-            <p className="text-sm text-slate-300 whitespace-pre-wrap">{error}</p>
-          </div>
-        )}
-
-        {sim && (
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mt-6 space-y-3 text-sm">
-            <div className="flex items-center space-x-2 text-emerald-400">
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-semibold">
-                {data.source === 'ai' ? `AI 생성 결과 (${data.model})` : '대체본 결과 (AI 호출 실패 또는 대체본 모드)'}
-              </span>
-            </div>
-            <p><b>{sim.ally_statement.speaker}</b>: {sim.ally_statement.text}</p>
-            <p><b>{sim.trade_response.speaker}</b>: {sim.trade_response.text}</p>
-            <p><b>{sim.news_article.headline}</b><br />{sim.news_article.body}</p>
-            <p className="text-amber-300">속보: {sim.ticker.join(' / ')}</p>
-            <p className="text-slate-400">
-              지표 변화: {Object.entries(sim.indicator_deltas).map(([k, v]) => `${LABELS[k]} ${Number(v) > 0 ? '+' : ''}${v}`).join(', ')}
-            </p>
-          </div>
-        )}
       </div>
     </main>
   );

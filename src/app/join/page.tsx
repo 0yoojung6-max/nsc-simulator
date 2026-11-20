@@ -4,7 +4,14 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db, ensureAnonAuth } from '@/app/lib/firebaseClient';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { POLICIES, EMBLEM_COLORS, EMBLEM_SHAPES, WORLD_ACTORS, isBlockedCountryName } from '@/app/lib/constants';
+import {
+  POLICIES,
+  EMBLEM_COLORS,
+  EMBLEM_SHAPES,
+  WORLD_ACTORS,
+  DEFAULT_SESSION_ID,
+  isBlockedCountryName,
+} from '@/app/lib/constants';
 import SimulationS4 from '@/components/SimulationS4';
 
 const POLICY_STYLES: Record<string, { idle: string; selected: string; tag: string }> = {
@@ -30,11 +37,33 @@ const POLICY_STYLES: Record<string, { idle: string; selected: string; tag: strin
   },
 };
 
+function validateStudentInput(text: string): string | null {
+  const trimmed = text.trim();
+  // 1. 초성/모음/기호만 있는 경우 (예: ㅋㅋㅋ, ㅇㅇ, ㄱㄴㄷ)
+  if (/^[ㄱ-ㅎㅏ-ㅣ\s!?.,~]+$/.test(trimmed)) {
+    return '초성이나 기호만으로는 제출할 수 없습니다. 문장으로 작성해 주세요.';
+  }
+  // 2. 같은 글자만 4번 이상 반복 (예: ㅋㅋㅋㅋ, 아아아아, 1111)
+  if (/(.)\1{3,}/.test(trimmed.replace(/\s/g, ''))) {
+    return '같은 글자를 반복하지 말고 내용을 구체적으로 적어 주세요.';
+  }
+  // 3. 기본 비속어 필터
+  const badWords = ['시발', '씨발', '병신', '개새끼', '존나', '미친놈', '꺼져', '닥쳐', '좆'];
+  if (badWords.some((w) => trimmed.includes(w))) {
+    return '부적절한 표현이 포함되어 있습니다. 바른 표현으로 고쳐 작성해 주세요.';
+  }
+  return null;
+}
+
+const ALLY_NAME = WORLD_ACTORS.ally.name;
+const TRADE_NAME = WORLD_ACTORS.trade.name;
+const CONFLICT_NAME = WORLD_ACTORS.conflict.name;
+
 function JoinContent() {
   const searchParams = useSearchParams();
-  const urlCode = searchParams.get('code')?.toUpperCase() || '';
+  const urlCode = searchParams.get('code')?.toUpperCase() || DEFAULT_SESSION_ID;
 
-  const [sessionCode, setSessionCode] = useState(urlCode);
+  const [sessionCode] = useState(urlCode);
   const [groupId, setGroupId] = useState<number | null>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [groupData, setGroupData] = useState<any>(null);
@@ -45,13 +74,16 @@ function JoinContent() {
   // S1 건국
   const [countryName, setCountryName] = useState('');
   const [countryIntro, setCountryIntro] = useState('');
-  const [emblemColor, setEmblemColor] = useState(EMBLEM_COLORS[0]);
-  const [emblemShape, setEmblemShape] = useState(EMBLEM_SHAPES[0]);
+  const [emblemColor, setEmblemColor] = useState<string>(EMBLEM_COLORS[0]);
+  const [emblemShape, setEmblemShape] = useState<string>(EMBLEM_SHAPES[0]);
 
-  // S3 정책 결정
+  // S3 정책 결정 및 사전 윤리 예측
   const [selectedPolicy, setSelectedPolicy] = useState<string>(POLICIES[0].label);
   const [reason, setReason] = useState('');
-  const [theoryLean, setTheoryLean] = useState<'동맹 신의·원칙 중심(의무론)' | '에너지·민생 실리 중심(공리주의)'>('동맹 신의·원칙 중심(의무론)');
+  const [theoryLean, setTheoryLean] = useState<
+    '동맹 신의·원칙 중심(의무론)' | '에너지·민생 실리 중심(공리주의)'
+  >('동맹 신의·원칙 중심(의무론)');
+  const [prePrediction, setPrePrediction] = useState('');
 
   // S3.5 ~ S3.6 재반박 및 최종 결정
   const [rebuttalReply, setRebuttalReply] = useState('');
@@ -60,7 +92,7 @@ function JoinContent() {
   const [finalReason, setFinalReason] = useState('');
   const [isBlackout, setIsBlackout] = useState(false);
 
-  // S5 양 관점 교차 검증
+  // S5 사후 양 관점 교차 검증
   const [utilCheck, setUtilCheck] = useState({
     citizens: '이익이 더 크다 (에너지·민생 보호)',
     world: '피해가 더 크다 (분쟁 확산·고립)',
@@ -74,14 +106,13 @@ function JoinContent() {
     note: '',
   });
 
-  // S6 광해군 비교
-  const [compareSame, setCompareSame] = useState('');
-  const [compareDiffs, setCompareDiffs] = useState({ diff1: '', diff2: '', diff3: '' });
+  // S6 광해군 비교 (공통점·차이점 자유 서술 단일 입력칸)
+  const [compareText, setCompareText] = useState('');
 
   useEffect(() => {
     if (!sessionCode) return;
     let unsubSession: any;
-    let unsubGroups: any[] = [];
+    const unsubGroups: any[] = [];
 
     ensureAnonAuth().then(() => {
       unsubSession = onSnapshot(doc(db, 'sessions', sessionCode), (snap) => {
@@ -149,6 +180,9 @@ function JoinContent() {
     if (isBlockedCountryName(countryName)) {
       return setErrorMsg('실제 국가명은 사용할 수 없습니다. 가상의 국가 이름을 입력해 주세요.');
     }
+    const invalidName = validateStudentInput(countryName);
+    if (invalidName) return setErrorMsg(invalidName);
+
     await callSessionApi('FOUND_COUNTRY', {
       name: countryName,
       intro: countryIntro,
@@ -160,6 +194,9 @@ function JoinContent() {
     if (reason.trim().length < 15) {
       return setErrorMsg('선택 이유를 15자 이상 간략히 작성해 주세요.');
     }
+    const invalidMsg = validateStudentInput(reason);
+    if (invalidMsg) return setErrorMsg(invalidMsg);
+
     setLoading(true);
     setErrorMsg('');
     try {
@@ -170,7 +207,15 @@ function JoinContent() {
           action: 'GENERATE_REBUTTAL',
           code: sessionCode,
           groupId,
-          payload: { policy: selectedPolicy, reason, theory: theoryLean },
+          payload: {
+            policy: selectedPolicy,
+            reason,
+            theory: theoryLean,
+            preTest: {
+              theory: theoryLean,
+              predictedOutcome: prePrediction,
+            },
+          },
         }),
       });
       const data = await res.json();
@@ -187,8 +232,11 @@ function JoinContent() {
 
   const handleSendCounterReply = async () => {
     if (rebuttalReply.trim().length < 10) {
-      return setErrorMsg('자문위원의 질문에 대한 대통령의 재반박을 10자 이상 작성해 주세요.');
+      return setErrorMsg('AI 외교 자문위원의 질문에 대한 대통령의 재반박을 10자 이상 작성해 주세요.');
     }
+    const invalidMsg = validateStudentInput(rebuttalReply);
+    if (invalidMsg) return setErrorMsg(invalidMsg);
+
     setLoading(true);
     setErrorMsg('');
     try {
@@ -217,6 +265,9 @@ function JoinContent() {
     if (finalReason.trim().length < 10) {
       return setErrorMsg('모둠 내 최종 결정 이유를 10자 이상 작성해 주세요.');
     }
+    const invalidMsg = validateStudentInput(finalReason);
+    if (invalidMsg) return setErrorMsg(invalidMsg);
+
     setLoading(true);
     setErrorMsg('');
     setIsBlackout(true);
@@ -281,9 +332,13 @@ function JoinContent() {
     return '자국민의 에너지와 민생을 우선한 실리주의 대통령';
   };
 
+  const preTheoryLabel =
+    groupData?.draft?.preTest?.theory || groupData?.draft?.theory || theoryLean;
+  const preOutcomeLabel =
+    groupData?.draft?.preTest?.predictedOutcome || prePrediction || '미입력';
+
   return (
     <div className="min-h-screen relative bg-[#E8EEF3] text-[#1E293B] flex flex-col font-sans overflow-x-hidden">
-      {/* S3.5 자문위원회 토론 전용 회의장 배경 레이어 */}
       {isCouncilDebate && (
         <div className="fixed inset-0 z-0 pointer-events-none">
           <div
@@ -347,16 +402,9 @@ function JoinContent() {
               <p className="text-sm text-slate-500">모둠 번호를 선택하세요.</p>
             </div>
 
-            {!urlCode && (
-              <div className="max-w-xs mx-auto">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={sessionCode}
-                  onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
-                  placeholder="세션 코드 6자리"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-center font-black tracking-widest uppercase"
-                />
+            {!searchParams.get('code') && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs font-bold text-amber-800">
+                교사 화면의 QR 코드로 접속해야 정상 입장됩니다. (테스트 시 URL 뒤에 <code>?code=세션코드</code>를 붙여주세요)
               </div>
             )}
 
@@ -367,7 +415,7 @@ function JoinContent() {
                   <button
                     key={num}
                     onClick={() => handleJoinGroup(num)}
-                    disabled={loading || !sessionCode}
+                    disabled={loading}
                     className={`p-6 rounded-2xl border-2 text-left transition ${
                       isOccupied
                         ? 'bg-slate-50 border-slate-200 text-slate-400'
@@ -402,7 +450,7 @@ function JoinContent() {
                     maxLength={8}
                     value={countryName}
                     onChange={(e) => setCountryName(e.target.value)}
-                    placeholder="예: 마르디아, 한울민국"
+                    placeholder="예: 한울민국, 세계제일무력국"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm font-bold"
                   />
                 </div>
@@ -422,24 +470,28 @@ function JoinContent() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-2">국기 색상 · 상징</label>
                   <div className="flex gap-2 mb-3">
-                    {EMBLEM_COLORS.map((c) => (
+                    {EMBLEM_COLORS.map((c: string) => (
                       <button
                         key={c}
                         type="button"
                         onClick={() => setEmblemColor(c)}
-                        className={`w-8 h-8 rounded-full border-2 ${emblemColor === c ? 'border-slate-900 scale-110' : 'border-transparent'}`}
+                        className={`w-8 h-8 rounded-full border-2 ${
+                          emblemColor === c ? 'border-slate-900 scale-110' : 'border-transparent'
+                        }`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    {EMBLEM_SHAPES.map((s) => (
+                    {EMBLEM_SHAPES.map((s: string) => (
                       <button
                         key={s}
                         type="button"
                         onClick={() => setEmblemShape(s)}
                         className={`py-2 px-3 rounded-xl border text-xs font-bold ${
-                          emblemShape === s ? 'bg-[#1E293B] text-white border-[#1E293B]' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          emblemShape === s
+                            ? 'bg-[#1E293B] text-white border-[#1E293B]'
+                            : 'bg-slate-50 border-slate-200 text-slate-700'
                         }`}
                       >
                         {s}
@@ -459,7 +511,9 @@ function JoinContent() {
             </div>
 
             <div className="md:col-span-5 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm text-center space-y-3">
-              <span className="text-[11px] font-extrabold px-3 py-1 bg-slate-100 text-slate-700 rounded-full">대통령 신분증</span>
+              <span className="text-[11px] font-extrabold px-3 py-1 bg-slate-100 text-slate-700 rounded-full">
+                대통령 신분증
+              </span>
               <div
                 className="w-24 h-24 mx-auto rounded-2xl flex items-center justify-center text-5xl text-white shadow"
                 style={{ backgroundColor: emblemColor }}
@@ -493,14 +547,14 @@ function JoinContent() {
               <div className="absolute inset-x-0 bottom-3 px-6 flex items-center justify-between text-white">
                 <div>
                   <span className="text-[11px] font-bold text-teal-300 block">오랜 안보 동맹국</span>
-                  <span className="text-lg font-black tracking-tight">프렌디아 (FRENDIA)</span>
+                  <span className="text-lg font-black tracking-tight">{ALLY_NAME}</span>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-black text-amber-300 border border-white/20">
                   {groupData?.country?.name}의 선택
                 </span>
                 <div className="text-right">
                   <span className="text-[11px] font-bold text-indigo-300 block">에너지·자원 강대국</span>
-                  <span className="text-lg font-black tracking-tight">그랜 (GRAN)</span>
+                  <span className="text-lg font-black tracking-tight">{TRADE_NAME}</span>
                 </div>
               </div>
             </div>
@@ -508,7 +562,8 @@ function JoinContent() {
             <div className="p-6 md:p-8 space-y-6">
               <div className="text-center space-y-1.5">
                 <h2 className="text-xl md:text-2xl font-black text-slate-900">
-                  인접국 <span className="text-rose-600">카스벨</span>이 동맹국 <span className="text-[#0F766E]">프렌디아</span>를 침공했습니다!
+                  인접국 <span className="text-rose-600">{CONFLICT_NAME}</span>이 동맹국{' '}
+                  <span className="text-[#0F766E]">{ALLY_NAME}</span>을 침공했습니다!
                 </h2>
                 <p className="text-xs md:text-sm text-slate-600">
                   대통령님, 두 국가의 상반된 요구 앞에서 어떤 결정을 내리시겠습니까?
@@ -563,7 +618,7 @@ function JoinContent() {
           </div>
         )}
 
-        {/* S3: 정책 결정 */}
+        {/* S3: 정책 결정 및 사전 윤리 검사 예측 */}
         {currentStep === 'S3' && (
           <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
             <div className="relative grid grid-cols-2 border-b border-slate-200">
@@ -575,7 +630,7 @@ function JoinContent() {
                 <div className="absolute inset-0 bg-gradient-to-r from-teal-50/90 to-white/80" />
                 <div className="relative z-10">
                   <span className="text-[10px] font-black text-[#0F766E] uppercase">동맹 · 조약 준수</span>
-                  <div className="font-black text-sm text-slate-900">프렌디아 “군사·물자 지원 요청”</div>
+                  <div className="font-black text-sm text-slate-900">{ALLY_NAME} “군사·물자 지원 요청”</div>
                 </div>
               </div>
 
@@ -587,7 +642,7 @@ function JoinContent() {
                 <div className="absolute inset-0 bg-gradient-to-l from-indigo-50/90 to-white/80" />
                 <div className="relative z-10">
                   <span className="text-[10px] font-black text-indigo-700 uppercase">실리 · 에너지 65%</span>
-                  <div className="font-black text-sm text-slate-900">그랜 “지원 시 가스·광물 차단”</div>
+                  <div className="font-black text-sm text-slate-900">{TRADE_NAME} “지원 시 가스·광물 차단”</div>
                 </div>
               </div>
             </div>
@@ -595,11 +650,11 @@ function JoinContent() {
             <div className="p-6 md:p-8 space-y-6">
               <div>
                 <h2 className="text-xl font-black text-slate-900">⚖️ [{groupData?.country?.name}] 대통령의 선택</h2>
-                <p className="text-xs text-slate-500 mt-0.5">4가지 외교 노선 중 하나를 선택하고 핵심 이유를 적으세요.</p>
+                <p className="text-xs text-slate-500 mt-0.5">4가지 외교 노선 중 하나를 선택하고 사전 윤리 예측과 이유를 적으세요.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {POLICIES.map((p) => {
+                {POLICIES.map((p: any) => {
                   const style = POLICY_STYLES[p.id] || POLICY_STYLES.full_support;
                   const isSelected = selectedPolicy === p.label;
                   return (
@@ -625,13 +680,13 @@ function JoinContent() {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={2}
-                  placeholder="프렌디아와의 신의와 그랜과의 에너지 이익 중 무엇을 우선했는지 적으세요."
+                  placeholder={`${ALLY_NAME}과의 신의와 ${TRADE_NAME}과의 에너지 이익 중 무엇을 우선했는지 적으세요.`}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">핵심 판단 기준</label>
+                <label className="block text-xs font-bold text-slate-700 mb-2">사전 윤리 관점 예측</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { id: '동맹 신의·원칙 중심(의무론)', desc: '손해를 보더라도 조약과 도덕적 원칙을 지킴' },
@@ -642,7 +697,9 @@ function JoinContent() {
                       type="button"
                       onClick={() => setTheoryLean(t.id as any)}
                       className={`p-3.5 rounded-xl border-2 text-left ${
-                        theoryLean === t.id ? 'bg-indigo-50 border-indigo-600' : 'border-slate-200 bg-slate-50/50'
+                        theoryLean === t.id
+                          ? 'bg-indigo-50 border-indigo-600'
+                          : 'border-slate-200 bg-slate-50/50'
                       }`}
                     >
                       <div className="font-bold text-sm text-slate-900">{t.id}</div>
@@ -652,33 +709,44 @@ function JoinContent() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">사전 예상 결과 메모</label>
+                <input
+                  type="text"
+                  value={prePrediction}
+                  onChange={(e) => setPrePrediction(e.target.value)}
+                  placeholder="예: 동맹 신뢰는 지키겠지만 국내 에너지·민생 부담이 생길 것으로 예상"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
+                />
+              </div>
+
               <button
                 onClick={handleRequestRebuttal}
                 disabled={loading}
                 className="w-full py-4 bg-[#0F766E] hover:bg-teal-800 text-white font-black rounded-2xl transition shadow-sm"
               >
-                {loading ? '외교 자문위원 검토 중...' : '정책 제출하고 자문위원 반론 듣기 ➔'}
+                {loading ? 'AI 외교 자문위원 검토 중...' : '정책 제출하고 AI 외교 자문위원 반론 듣기 ➔'}
               </button>
             </div>
           </div>
         )}
 
-        {/* S3.5: 국가안보회의(의회/회의장) 배경 위 2왕복 심층 토론 */}
+        {/* S3.5: 국가안보회의(회의장) 배경 위 AI 외교 자문위원 2왕복 토론 */}
         {currentStep === 'S3.5' && groupData?.rebuttal && (
           <div className="space-y-4">
-            {/* 상단 회의장 현장 배지 */}
             <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white shadow-lg">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-xs font-black tracking-wide">🏛️ [{groupData?.country?.name}] 긴급 국가안보회의장</span>
+                <span className="text-xs font-black tracking-wide">
+                  🏛️ [{groupData?.country?.name}] 긴급 국가안보회의장
+                </span>
               </div>
               <span className="text-[11px] font-bold text-slate-300">
-                수석 외교 자문위원회 심층 검토 중
+                AI 외교 자문위원회 심층 검토 중
               </span>
             </div>
 
             <div className="bg-white/95 backdrop-blur-md border border-white/40 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-              {/* 상단: 우리 모둠 1차 제출안 요약 */}
               <div className="p-4 bg-slate-50/90 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="text-[11px] font-extrabold text-slate-500">1차 제출 노선</span>
@@ -690,10 +758,9 @@ function JoinContent() {
                 </span>
               </div>
 
-              {/* 1. AI 자문위원 1차 반론 */}
               <div className="p-5 bg-amber-50/90 border-2 border-amber-400 rounded-2xl space-y-2.5">
                 <span className="text-xs font-black px-2.5 py-0.5 bg-amber-500 text-white rounded">
-                  💬 외교 자문위원의 1차 반론
+                  💬 AI 외교 자문위원의 1차 반론
                 </span>
                 <p className="text-base font-bold text-slate-900 leading-relaxed">{groupData.rebuttal.rebuttal}</p>
                 <div className="p-3.5 bg-white rounded-xl border border-amber-200">
@@ -702,12 +769,11 @@ function JoinContent() {
                 </div>
               </div>
 
-              {/* 2. 대통령 재반박 입력 (2차 반론 전) 또는 확정된 재반박 말풍선 */}
               {!groupData.finalRebuttal ? (
                 <div className="space-y-4 pt-1">
                   <div>
                     <label className="block text-xs font-black text-slate-800 mb-1.5">
-                      🎙️ 대통령의 재반박 작성 (자문위원의 지적에 어떻게 대응하시겠습니까?)
+                      🎙️ 대통령의 재반박 작성 (AI 외교 자문위원의 지적에 어떻게 대응하시겠습니까?)
                     </label>
                     <textarea
                       rows={2}
@@ -723,21 +789,27 @@ function JoinContent() {
                     disabled={loading}
                     className="w-full py-4 bg-[#1E293B] hover:bg-slate-800 text-white font-black rounded-2xl transition shadow-sm text-base"
                   >
-                    {loading ? '자문위원이 대통령의 재반박을 검토 중...' : '재반박 전달하고 자문위원의 마지막 반론 듣기 ➔'}
+                    {loading
+                      ? 'AI 외교 자문위원이 대통령의 재반박을 검토 중...'
+                      : '재반박 전달하고 AI 외교 자문위원의 마지막 반론 듣기 ➔'}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <div className="p-4 bg-teal-50/90 border border-teal-200 rounded-2xl ml-4 sm:ml-10 space-y-1">
-                    <span className="text-xs font-black text-[#0F766E]">🎖️ [{groupData?.country?.name}] 대통령의 재반박</span>
+                    <span className="text-xs font-black text-[#0F766E]">
+                      🎖️ [{groupData?.country?.name}] 대통령의 재반박
+                    </span>
                     <p className="text-sm font-bold text-slate-800">“{groupData.rebuttalReply}”</p>
                   </div>
 
                   <div className="p-5 bg-rose-50/90 border-2 border-rose-400 rounded-2xl space-y-2.5">
                     <span className="text-xs font-black px-2.5 py-0.5 bg-rose-600 text-white rounded">
-                      🔥 외교 자문위원의 2차 최종 반론
+                      🔥 AI 외교 자문위원의 2차 최종 반론
                     </span>
-                    <p className="text-base font-bold text-slate-900 leading-relaxed">{groupData.finalRebuttal.rebuttal}</p>
+                    <p className="text-base font-bold text-slate-900 leading-relaxed">
+                      {groupData.finalRebuttal.rebuttal}
+                    </p>
                     <div className="p-3.5 bg-white rounded-xl border border-rose-200">
                       <span className="text-xs font-black text-rose-700">❓ 마지막 결정 질문</span>
                       <p className="text-sm font-bold text-slate-800 mt-0.5">{groupData.finalRebuttal.question}</p>
@@ -748,7 +820,7 @@ function JoinContent() {
                     <div>
                       <h3 className="text-base font-black text-slate-900">🏛️ 모둠 내 최종 결정 확정</h3>
                       <p className="text-xs text-slate-600 mt-0.5">
-                        두 차례의 반론을 거친 뒤 모둠원들과 합의한 최종 노선과 확정 이유를 작성하세요.
+                        AI 외교 자문위원의 반론을 검토한 뒤 모둠원들과 합의한 최종 노선과 수정 이유를 작성하세요.
                       </p>
                     </div>
 
@@ -764,7 +836,9 @@ function JoinContent() {
                             }
                           }}
                           className={`flex-1 py-3 rounded-xl border-2 font-black text-sm ${
-                            keepOrRevise === opt ? 'border-[#1E293B] bg-[#1E293B] text-white' : 'border-slate-200 bg-white text-slate-600'
+                            keepOrRevise === opt
+                              ? 'border-[#1E293B] bg-[#1E293B] text-white'
+                              : 'border-slate-200 bg-white text-slate-600'
                           }`}
                         >
                           기존 노선 {opt} ({groupData.draft?.policy})
@@ -780,8 +854,10 @@ function JoinContent() {
                           onChange={(e) => setFinalPolicy(e.target.value)}
                           className="w-full border border-slate-300 rounded-xl p-3 text-sm bg-white font-bold"
                         >
-                          {POLICIES.map((p) => (
-                            <option key={p.id} value={p.label}>{p.label}</option>
+                          {POLICIES.map((p: any) => (
+                            <option key={p.id} value={p.label}>
+                              {p.label}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -789,13 +865,13 @@ function JoinContent() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        모둠 최종 결정문 (10자 이상 · 뉴스 특보에 반영됩니다)
+                        모둠 최종 결정 및 수정 이유 (10자 이상 · 뉴스 특보에 반영됩니다)
                       </label>
                       <textarea
                         rows={2}
                         value={finalReason}
                         onChange={(e) => setFinalReason(e.target.value)}
-                        placeholder="토론 끝에 이 노선을 최종 선택한 이유와 감수하기로 한 대가를 적어주세요."
+                        placeholder="AI 반론 중 수용·조정한 점과 최종 선택 이유를 적어주세요."
                         className="w-full border border-slate-300 rounded-xl p-3 text-sm bg-white"
                       />
                     </div>
@@ -814,14 +890,32 @@ function JoinContent() {
           </div>
         )}
 
-        {/* S5: 공리주의 × 의무론 양 관점 교차 검증 */}
+        {/* S5: 사후 윤리 검증 및 사전 vs 사후 비교 */}
         {(currentStep === 'S5' || currentStep === 'S5_WAIT') && (
           <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-xl font-black text-slate-900">
-                🔍 [{groupData?.country?.name}]의 “{groupData?.final?.policy}” 윤리 검증
+                🔍 [{groupData?.country?.name}]의 “{groupData?.final?.policy}” 사후 윤리 검증
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">시뮬레이션 결과를 바탕으로 두 윤리 이론 기준을 각각 판정하세요.</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                시뮬레이션 결과를 바탕으로 두 윤리 이론 기준을 각각 판정하고 사전 예측과 비교하세요.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs">
+              <div className="rounded-xl bg-white p-3.5 border border-slate-200 space-y-1">
+                <span className="font-extrabold text-blue-700">사전 예측 (정책 결정 전)</span>
+                <p className="font-bold text-slate-800">{preTheoryLabel}</p>
+                <p className="text-slate-600">예상: {preOutcomeLabel}</p>
+              </div>
+              <div className="rounded-xl bg-white p-3.5 border border-slate-200 space-y-1">
+                <span className="font-extrabold text-emerald-700">사후 판정 (시뮬레이션 후)</span>
+                <p className="font-bold text-slate-800">
+                  공리주의: {groupData?.check?.utilVerdict || utilCheck.verdict} / 의무론:{' '}
+                  {groupData?.check?.deonVerdict || deonCheck.verdict}
+                </p>
+                <p className="text-slate-600">최종 정책: {groupData?.final?.policy || finalPolicy}</p>
+              </div>
             </div>
 
             {currentStep === 'S5_WAIT' ? (
@@ -829,10 +923,24 @@ function JoinContent() {
                 <h3 className="text-lg font-black text-slate-900">윤리 이론 검증 완료</h3>
                 <div className="flex flex-wrap justify-center gap-3 text-sm">
                   <span className="px-4 py-2 rounded-xl bg-white border border-slate-200 font-bold">
-                    공리주의: <b className={groupData?.check?.utilVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'}>{groupData?.check?.utilVerdict}</b>
+                    공리주의:{' '}
+                    <b
+                      className={
+                        groupData?.check?.utilVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'
+                      }
+                    >
+                      {groupData?.check?.utilVerdict}
+                    </b>
                   </span>
                   <span className="px-4 py-2 rounded-xl bg-white border border-slate-200 font-bold">
-                    의무론: <b className={groupData?.check?.deonVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'}>{groupData?.check?.deonVerdict}</b>
+                    의무론:{' '}
+                    <b
+                      className={
+                        groupData?.check?.deonVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'
+                      }
+                    >
+                      {groupData?.check?.deonVerdict}
+                    </b>
                   </span>
                 </div>
                 {sessionData?.presenterGroup === groupId && (
@@ -886,7 +994,9 @@ function JoinContent() {
                         onClick={() => setUtilCheck({ ...utilCheck, verdict: v })}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-black border ${
                           utilCheck.verdict === v
-                            ? v === '통과' ? 'bg-[#0F766E] text-white border-[#0F766E]' : 'bg-rose-600 text-white border-rose-600'
+                            ? v === '통과'
+                              ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                              : 'bg-rose-600 text-white border-rose-600'
                             : 'bg-white text-slate-600 border-slate-300'
                         }`}
                       >
@@ -910,7 +1020,9 @@ function JoinContent() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">프렌디아와의 방위조약 준수 여부</label>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        {ALLY_NAME}과의 방위조약 준수 여부
+                      </label>
                       <select
                         value={deonCheck.promiseKept}
                         onChange={(e) => setDeonCheck({ ...deonCheck, promiseKept: e.target.value })}
@@ -940,7 +1052,9 @@ function JoinContent() {
                         onClick={() => setDeonCheck({ ...deonCheck, verdict: v })}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-black border ${
                           deonCheck.verdict === v
-                            ? v === '통과' ? 'bg-[#0F766E] text-white border-[#0F766E]' : 'bg-rose-600 text-white border-rose-600'
+                            ? v === '통과'
+                              ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                              : 'bg-rose-600 text-white border-rose-600'
                             : 'bg-white text-slate-600 border-slate-300'
                         }`}
                       >
@@ -978,7 +1092,7 @@ function JoinContent() {
           </div>
         )}
 
-        {/* S6: 광해군 비교 및 최종 리포트 */}
+        {/* S6: 광해군 비교 (단순화) 및 최종 리포트 */}
         {(currentStep === 'S6' || currentStep === 'DONE') && (
           <div className="space-y-6">
             {currentStep === 'DONE' ? (
@@ -1001,16 +1115,25 @@ function JoinContent() {
                   </div>
 
                   <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
-                    <span className="text-xs text-slate-500 font-bold">윤리 이론 판정 결과</span>
+                    <span className="text-xs text-slate-500 font-bold">사전 예측 vs 사후 판정</span>
+                    <div className="text-xs text-slate-600">사전: {preTheoryLabel}</div>
                     <div className="flex justify-between text-xs font-bold">
                       <span>공리주의:</span>
-                      <span className={groupData?.check?.utilVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'}>
+                      <span
+                        className={
+                          groupData?.check?.utilVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'
+                        }
+                      >
                         {groupData?.check?.utilVerdict} ({groupData?.check?.utilNote})
                       </span>
                     </div>
                     <div className="flex justify-between text-xs font-bold">
                       <span>의무론:</span>
-                      <span className={groupData?.check?.deonVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'}>
+                      <span
+                        className={
+                          groupData?.check?.deonVerdict === '통과' ? 'text-[#0F766E]' : 'text-rose-600'
+                        }
+                      >
                         {groupData?.check?.deonVerdict} ({groupData?.check?.deonNote})
                       </span>
                     </div>
@@ -1020,7 +1143,12 @@ function JoinContent() {
                 <div className="bg-teal-50/70 border border-teal-200 p-5 rounded-2xl space-y-1.5">
                   <h4 className="font-black text-sm text-teal-900">💡 핵심 정리</h4>
                   <p className="text-xs md:text-sm text-slate-700 leading-relaxed">
-                    명·후금 사이에서 고민한 <b>광해군</b>처럼, 오늘 여러분의 선택 역시 <b>의무론적 신의를 지키면 공리주의적 피해가 커지고, 공리주의적 실리를 택하면 의무론적 비판을 받는 딜레마</b>를 보여주었습니다.
+                    명·후금 사이에서 고민한 <b>광해군</b>처럼, 오늘 여러분의 선택 역시{' '}
+                    <b>
+                      의무론적 신의를 지키면 공리주의적 피해가 커지고, 공리주의적 실리를 택하면 의무론적 비판을
+                      받는 딜레마
+                    </b>
+                    를 보여주었습니다.
                   </p>
                 </div>
 
@@ -1031,71 +1159,23 @@ function JoinContent() {
             ) : (
               <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-5">
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">📜 17세기 광해군 vs 오늘날 우리의 선택 비교</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">명·후금 사이 광해군의 상황과 오늘 우리 모둠의 상황을 비교해 보세요.</p>
+                  <h2 className="text-xl font-black text-slate-900">📜 광해군의 외교 정책과 비교하기</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    명·후금 사이 광해군의 선택과 우리 모둠의 외교적 결정 사이의 공통점과 차이점을 자유롭게 적어보세요.
+                  </p>
                 </div>
 
-                <div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                    <label className="text-xs font-bold text-slate-800">
-                      1. 공통점 (두 시대가 겪은 딜레마의 공통점)
-                    </label>
-                    <span className="text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                      힌트: #동맹의_의리_vs_실리 · #강대국_사이_선택
-                    </span>
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={compareSame}
-                    onChange={(e) => setCompareSame(e.target.value)}
-                    placeholder="광해군과 오늘날 대통령 모두 어떤 갈등 상황에 놓여 있었나요?"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <h4 className="font-black text-sm text-slate-900">2. 차이점 (광해군 시대와 오늘날이 달라진 점)</h4>
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                      <label className="text-xs font-bold text-slate-700">① 국제법과 조약 체계</label>
-                      <span className="text-[11px] font-medium text-slate-500">힌트: #사대_명분 vs #상호방위조약·국제법</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={compareDiffs.diff1}
-                      onChange={(e) => setCompareDiffs({ ...compareDiffs, diff1: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                      <label className="text-xs font-bold text-slate-700">② 국제기구 및 세계 여론</label>
-                      <span className="text-[11px] font-medium text-slate-500">힌트: #양국_관계_중심 vs #UN·국제사회_압박</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={compareDiffs.diff2}
-                      onChange={(e) => setCompareDiffs({ ...compareDiffs, diff2: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                      <label className="text-xs font-bold text-slate-700">③ 국내 여론과 국민 경제</label>
-                      <span className="text-[11px] font-medium text-slate-500">힌트: #신하들의_상소 vs #국민_여론·에너지_무역</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={compareDiffs.diff3}
-                      onChange={(e) => setCompareDiffs({ ...compareDiffs, diff3: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm"
-                    />
-                  </div>
-                </div>
+                <textarea
+                  rows={4}
+                  value={compareText}
+                  onChange={(e) => setCompareText(e.target.value)}
+                  placeholder="예) 공통점: 강대국 사이에서 실리와 피해를 함께 고민했다. / 차이점: 우리는 인도적 지원 기준을 세워 절충했다."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-sm"
+                />
 
                 <button
-                  onClick={() => callSessionApi('SUBMIT_COMPARE', { compare: { same: compareSame, ...compareDiffs } })}
-                  disabled={loading || !compareSame.trim() || !compareDiffs.diff1.trim() || !compareDiffs.diff2.trim() || !compareDiffs.diff3.trim()}
+                  onClick={() => callSessionApi('SUBMIT_COMPARE', { compare: { summary: compareText } })}
+                  disabled={loading || !compareText.trim()}
                   className="w-full py-4 bg-[#0F766E] hover:bg-teal-800 text-white font-black rounded-2xl shadow-sm text-base"
                 >
                   비교 제출 및 최종 리포트 보기 🏆
@@ -1111,7 +1191,9 @@ function JoinContent() {
 
 export default function JoinPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#E8EEF3] p-8 text-center font-bold">불러오는 중...</div>}>
+    <Suspense
+      fallback={<div className="min-h-screen bg-[#E8EEF3] p-8 text-center font-bold">불러오는 중...</div>}
+    >
       <JoinContent />
     </Suspense>
   );

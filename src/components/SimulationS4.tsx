@@ -146,7 +146,7 @@ export default function SimulationS4({ countryName, policy, simulationData, s4Co
     {
       tag: 'SCENE 01 · 동맹국 공식 반응',
       badgeColor: 'bg-[#34B3A8] text-[#0A0F14]',
-      speaker: simulationData?.ally_statement?.speaker || '프렌디아 외무부 성명',
+      speaker: simulationData?.ally_statement?.speaker || '떡국 외무부 성명',
       headline: simulationData?.ally_statement?.text,
       videoUrl: simulationData?.ally_statement?.videoUrl,
       fallbackSvg: (
@@ -167,7 +167,7 @@ export default function SimulationS4({ countryName, policy, simulationData, s4Co
     {
       tag: 'SCENE 02 · 강대국 통상 조치',
       badgeColor: 'bg-[#E2504A] text-white',
-      speaker: simulationData?.trade_response?.speaker || '그랜 에너지부 발표',
+      speaker: simulationData?.trade_response?.speaker || '미역국 에너지부 발표',
       headline: simulationData?.trade_response?.text,
       videoUrl: simulationData?.trade_response?.videoUrl,
       fallbackSvg: (
@@ -308,7 +308,7 @@ export default function SimulationS4({ countryName, policy, simulationData, s4Co
           {isCompleted ? (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-black/85 border border-white/15 p-4 rounded-2xl">
               <div className="flex flex-wrap gap-2">
-                {['1. 프렌디아 반응', '2. 그랜 조치', '3. 국내 여론'].map((label, i) => {
+                {['1. 떡국 반응', '2. 미역국 조치', '3. 국내 여론'].map((label, i) => {
                   const isActiveTab = sceneIdx === i + 1;
                   return (
                     <button

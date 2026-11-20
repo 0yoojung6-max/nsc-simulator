@@ -161,7 +161,7 @@ export default function TeacherPage() {
     const demoPresets = [
       {
         id: 1,
-        name: '마르디아',
+        name: '불닭국',
         intro: '조약과 신의를 지키는 나라',
         color: '#1E293B',
         shape: '🛡️ 방패',
@@ -193,7 +193,7 @@ export default function TeacherPage() {
       },
       {
         id: 3,
-        name: '솔라리스',
+        name: '세계제일무력국',
         intro: '생명 존중과 인도주의를 지향하는 나라',
         color: '#D97706',
         shape: '⚖️ 천칭',
@@ -209,7 +209,7 @@ export default function TeacherPage() {
       },
       {
         id: 4,
-        name: '노르드아크',
+        name: '텐텐',
         intro: '자국민의 민생을 우선하는 나라',
         color: '#4F46E5',
         shape: '🧭 나침반',

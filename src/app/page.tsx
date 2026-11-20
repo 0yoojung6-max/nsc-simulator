@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { WORLD_ACTORS } from '@/app/lib/constants';
 
 export default function HomePage() {
+  const allyName = WORLD_ACTORS.ally.name;
+  const tradeName = WORLD_ACTORS.trade.name;
+
   return (
     <main className="min-h-screen relative flex items-center justify-center p-4 md:p-8 overflow-hidden bg-[#0F172A]">
       {/* 1. 배경 일러스트 레이어 (화면 크기에 맞게 여백을 지키고 잘림을 방지하기 위한 object/bg 설정) */}
@@ -27,7 +31,9 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xs sm:text-sm md:text-base font-bold text-slate-200 leading-relaxed max-w-md mx-auto">
-            동맹의 신의(<span className="text-teal-300">프렌디아</span>)와 자국의 실리(<span className="text-indigo-300">그랜</span>)가 충돌할 때,<br className="hidden sm:inline" />
+            동맹의 신의(<span className="text-teal-300">{allyName}</span>)와 자국의 실리(
+            <span className="text-indigo-300">{tradeName}</span>)가 충돌할 때,
+            <br className="hidden sm:inline" />
             대통령으로서 어떤 외교 노선을 선택하시겠습니까?
           </p>
         </div>
@@ -39,7 +45,9 @@ export default function HomePage() {
             className="group p-4 sm:p-5 rounded-2xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-black text-base sm:text-lg shadow-lg transition duration-200 flex flex-col items-center justify-center gap-1"
           >
             <span className="flex items-center gap-1">🎖️ 모둠 대통령 입장</span>
-            <span className="text-[10px] sm:text-xs font-normal text-teal-100 group-hover:text-white transition">QR · 세션 코드로 참여</span>
+            <span className="text-[10px] sm:text-xs font-normal text-teal-100 group-hover:text-white transition">
+              QR · 세션 코드로 참여
+            </span>
           </Link>
 
           <Link
@@ -47,7 +55,9 @@ export default function HomePage() {
             className="group p-4 sm:p-5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-100 font-black text-base sm:text-lg transition duration-200 flex flex-col items-center justify-center gap-1"
           >
             <span>🧑‍🏫 교사 통제실</span>
-            <span className="text-[10px] sm:text-xs font-normal text-slate-400 group-hover:text-slate-300 transition">세션 개설 및 타이머 제어</span>
+            <span className="text-[10px] sm:text-xs font-normal text-slate-400 group-hover:text-slate-300 transition">
+              세션 개설 및 타이머 제어
+            </span>
           </Link>
         </div>
       </div>

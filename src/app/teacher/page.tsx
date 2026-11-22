@@ -18,7 +18,7 @@ const CONFLICT_NAME = WORLD_ACTORS.conflict.name;
 export default function TeacherPage() {
   const [passcode, setPasscode] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sessionCode, setSessionCode] = useState('');
+  const [sessionCode, setSessionCode] = useState(DEFAULT_SESSION_ID);
   const [sessionData, setSessionData] = useState<any>(null);
   const [groups, setGroups] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
@@ -96,7 +96,7 @@ export default function TeacherPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setSessionCode(data.code);
+      setSessionCode(data.code || DEFAULT_SESSION_ID);
       setIsAuthenticated(true);
     } catch (e: any) {
       setErrorMsg(e.message);
@@ -161,7 +161,7 @@ export default function TeacherPage() {
     const demoPresets = [
       {
         id: 1,
-        name: '불닭국',
+        name: '청솔국',
         intro: '조약과 신의를 지키는 나라',
         color: '#1E293B',
         shape: '🛡️ 방패',
@@ -193,7 +193,7 @@ export default function TeacherPage() {
       },
       {
         id: 3,
-        name: '세계제일무력국',
+        name: '가온국',
         intro: '생명 존중과 인도주의를 지향하는 나라',
         color: '#D97706',
         shape: '⚖️ 천칭',
@@ -209,7 +209,7 @@ export default function TeacherPage() {
       },
       {
         id: 4,
-        name: '텐텐',
+        name: '다솜국',
         intro: '자국민의 민생을 우선하는 나라',
         color: '#4F46E5',
         shape: '🧭 나침반',
@@ -261,7 +261,7 @@ export default function TeacherPage() {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const joinUrl = `${originUrl}/join?code=${sessionCode || DEFAULT_SESSION_ID}`;
+  const joinUrl = `${originUrl}/join`;
   const presenterGroupNum = sessionData?.presenterGroup;
   const presenterData = presenterGroupNum ? groups[String(presenterGroupNum)] : null;
 
@@ -283,7 +283,7 @@ export default function TeacherPage() {
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
-            placeholder="교사 비밀번호 (1234)"
+            placeholder="교사 비밀번호 입력"
             className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-center font-black tracking-widest"
           />
           <button
@@ -291,7 +291,7 @@ export default function TeacherPage() {
             disabled={loading}
             className="w-full py-4 bg-[#1E293B] text-white font-black rounded-xl shadow"
           >
-            {loading ? '세션 여는 중...' : '🚀 수업 세션 시작하기'}
+            {loading ? '통제실 여는 중...' : '🚀 수업 통제실 열기'}
           </button>
         </div>
       </main>
@@ -374,18 +374,15 @@ export default function TeacherPage() {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-lg font-black">대통령 외교 시뮬레이터 · 교사 통제실</h1>
-            <span className="bg-[#0F766E] text-white font-black px-3 py-1 rounded-lg text-sm tracking-widest">
-              코드: {sessionCode}
-            </span>
             <button
               onClick={() => setShowLargeQR(true)}
-              className="bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg text-xs font-bold"
+              className="bg-[#0F766E] hover:bg-teal-600 px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs"
             >
-              📱 QR 크게 보기
+              📱 학생 입장 QR 보기
             </button>
             <button
               onClick={() => setShowBriefingModal(true)}
-              className="bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg text-xs font-black shadow-xs"
+              className="bg-rose-600 hover:bg-rose-500 px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs"
             >
               🚨 외교 위기 브리핑 화면 보기
             </button>
@@ -636,7 +633,6 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {/* 4. 광해군 비교 공유 탭 */}
         {activeTab === 'COMPARE' && (
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
             <h2 className="text-lg font-black text-slate-900">
@@ -695,7 +691,7 @@ export default function TeacherPage() {
         )}
       </main>
 
-      {/* QR 코드 크게 보기 모달 */}
+      {/* QR 코드 크게 보기 모달 (세션 코드 표기 제거) */}
       {showLargeQR && (
         <div
           className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6"
@@ -706,11 +702,9 @@ export default function TeacherPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-black text-slate-900">모둠 기기 QR 코드 입장</h2>
+            <p className="text-xs text-slate-500">스마트폰 카메라로 스캔하면 모둠 선택 화면으로 바로 이동합니다.</p>
             <div className="flex justify-center p-4 bg-white border-2 border-slate-100 rounded-2xl">
               <QRCodeSVG value={joinUrl} size={240} />
-            </div>
-            <div className="text-2xl font-black text-[#0F766E] tracking-widest">
-              세션 코드: {sessionCode}
             </div>
             <button
               onClick={() => setShowLargeQR(false)}
@@ -756,27 +750,38 @@ export default function TeacherPage() {
 
               <div className="absolute inset-x-0 bottom-4 px-6 md:px-8 flex items-center justify-between text-white">
                 <div>
-                  <span className="text-[11px] font-bold text-teal-300 block">오랜 안보 동맹국</span>
+                  <span className="text-[11px] font-bold text-teal-300 block">상호방위조약 동맹국</span>
                   <span className="text-xl font-black tracking-tight">{ALLY_NAME}</span>
                 </div>
                 <span className="px-3.5 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-black text-amber-300 border border-white/20">
                   우리 나라의 선택
                 </span>
                 <div className="text-right">
-                  <span className="text-[11px] font-bold text-indigo-300 block">에너지·자원 강대국</span>
+                  <span className="text-[11px] font-bold text-indigo-300 block">{CONFLICT_NAME} 우방 · 에너지 강국</span>
                   <span className="text-xl font-black tracking-tight">{TRADE_NAME}</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 md:p-8 space-y-6">
+            <div className="p-6 md:p-8 space-y-5">
               <div className="text-center space-y-1.5">
                 <h2 className="text-2xl md:text-3xl font-black text-slate-900">
-                  인접국 <span className="text-rose-600">{CONFLICT_NAME}</span>이 동맹국{' '}
-                  <span className="text-[#0F766E]">{ALLY_NAME}</span>을 침공했습니다!
+                  군사 강국 <span className="text-rose-600">{CONFLICT_NAME}</span>이 우리 동맹국{' '}
+                  <span className="text-[#0F766E]">{ALLY_NAME}</span>을 전격 침공했습니다!
                 </h2>
                 <p className="text-sm text-slate-600">
                   대통령님, 두 국가의 상반된 요구 앞에서 어떤 결정을 내리시겠습니까?
+                </p>
+              </div>
+
+              {/* 4개국 관계 설명 박스 */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs md:text-sm text-slate-700 leading-relaxed space-y-1.5">
+                <div className="font-black text-slate-900">📌 현재 국제 정세 및 우리나라와의 관계</div>
+                <p>
+                  • <b>우리나라 ↔ {ALLY_NAME} (상호방위조약 동맹):</b> 과거 위기 때 {ALLY_NAME}이 우리를 구해준 혈맹으로, 침공 시 군사·물자를 지원하기로 조약이 맺어져 있습니다.
+                </p>
+                <p>
+                  • <b>{CONFLICT_NAME} ↔ {TRADE_NAME} (긴밀한 우방·자원 파트너):</b> {CONFLICT_NAME}이 {ALLY_NAME}을 침공하자, {CONFLICT_NAME}의 우방인 에너지 강대국 <b>{TRADE_NAME}</b>이 “{ALLY_NAME}을 도우면 {CONFLICT_NAME}을 적대하는 것으로 간주해, 너희 나라로 가는 천연가스·광물(65%)을 즉시 끊겠다”고 압박하고 있습니다.
                 </p>
               </div>
 

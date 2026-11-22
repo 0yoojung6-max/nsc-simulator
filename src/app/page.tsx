@@ -46,7 +46,7 @@ export default function HomePage() {
           >
             <span className="flex items-center gap-1">🎖️ 모둠 대통령 입장</span>
             <span className="text-[10px] sm:text-xs font-normal text-teal-100 group-hover:text-white transition">
-              QR · 세션 코드로 참여
+              QR 코드 · 바로 참여
             </span>
           </Link>
 

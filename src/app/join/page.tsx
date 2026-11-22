@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { db, ensureAnonAuth } from '@/app/lib/firebaseClient';
 import { doc, onSnapshot } from 'firebase/firestore';
 import {
@@ -39,15 +38,12 @@ const POLICY_STYLES: Record<string, { idle: string; selected: string; tag: strin
 
 function validateStudentInput(text: string): string | null {
   const trimmed = text.trim();
-  // 1. 초성/모음/기호만 있는 경우 (예: ㅋㅋㅋ, ㅇㅇ, ㄱㄴㄷ)
   if (/^[ㄱ-ㅎㅏ-ㅣ\s!?.,~]+$/.test(trimmed)) {
     return '초성이나 기호만으로는 제출할 수 없습니다. 문장으로 작성해 주세요.';
   }
-  // 2. 같은 글자만 4번 이상 반복 (예: ㅋㅋㅋㅋ, 아아아아, 1111)
   if (/(.)\1{3,}/.test(trimmed.replace(/\s/g, ''))) {
     return '같은 글자를 반복하지 말고 내용을 구체적으로 적어 주세요.';
   }
-  // 3. 기본 비속어 필터
   const badWords = ['시발', '씨발', '병신', '개새끼', '존나', '미친놈', '꺼져', '닥쳐', '좆'];
   if (badWords.some((w) => trimmed.includes(w))) {
     return '부적절한 표현이 포함되어 있습니다. 바른 표현으로 고쳐 작성해 주세요.';
@@ -60,10 +56,7 @@ const TRADE_NAME = WORLD_ACTORS.trade.name;
 const CONFLICT_NAME = WORLD_ACTORS.conflict.name;
 
 function JoinContent() {
-  const searchParams = useSearchParams();
-  const urlCode = searchParams.get('code')?.toUpperCase() || DEFAULT_SESSION_ID;
-
-  const [sessionCode] = useState(urlCode);
+  const sessionCode = DEFAULT_SESSION_ID;
   const [groupId, setGroupId] = useState<number | null>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [groupData, setGroupData] = useState<any>(null);
@@ -106,11 +99,10 @@ function JoinContent() {
     note: '',
   });
 
-  // S6 광해군 비교 (공통점·차이점 자유 서술 단일 입력칸)
+  // S6 광해군 비교
   const [compareText, setCompareText] = useState('');
 
   useEffect(() => {
-    if (!sessionCode) return;
     let unsubSession: any;
     const unsubGroups: any[] = [];
 
@@ -142,10 +134,8 @@ function JoinContent() {
   }, [sessionCode, groupId]);
 
   useEffect(() => {
-    if (sessionCode) {
-      const savedGroup = localStorage.getItem(`nsc_group_${sessionCode}`);
-      if (savedGroup) setGroupId(Number(savedGroup));
-    }
+    const savedGroup = localStorage.getItem(`nsc_group_${sessionCode}`);
+    if (savedGroup) setGroupId(Number(savedGroup));
   }, [sessionCode]);
 
   const callSessionApi = async (action: string, payload: any = {}, targetGroup = groupId) => {
@@ -402,12 +392,6 @@ function JoinContent() {
               <p className="text-sm text-slate-500">모둠 번호를 선택하세요.</p>
             </div>
 
-            {!searchParams.get('code') && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs font-bold text-amber-800">
-                교사 화면의 QR 코드로 접속해야 정상 입장됩니다. (테스트 시 URL 뒤에 <code>?code=세션코드</code>를 붙여주세요)
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((num) => {
                 const isOccupied = allGroups[String(num)]?.occupied;
@@ -450,7 +434,7 @@ function JoinContent() {
                     maxLength={8}
                     value={countryName}
                     onChange={(e) => setCountryName(e.target.value)}
-                    placeholder="예: 한울민국, 세계제일무력국"
+                    placeholder="예: 한울민국, 청솔국"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm font-bold"
                   />
                 </div>
@@ -546,27 +530,39 @@ function JoinContent() {
 
               <div className="absolute inset-x-0 bottom-3 px-6 flex items-center justify-between text-white">
                 <div>
-                  <span className="text-[11px] font-bold text-teal-300 block">오랜 안보 동맹국</span>
+                  <span className="text-[11px] font-bold text-teal-300 block">상호방위조약 동맹국</span>
                   <span className="text-lg font-black tracking-tight">{ALLY_NAME}</span>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-black text-amber-300 border border-white/20">
                   {groupData?.country?.name}의 선택
                 </span>
                 <div className="text-right">
-                  <span className="text-[11px] font-bold text-indigo-300 block">에너지·자원 강대국</span>
+                  <span className="text-[11px] font-bold text-indigo-300 block">{CONFLICT_NAME} 우방 · 에너지 강국</span>
                   <span className="text-lg font-black tracking-tight">{TRADE_NAME}</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 md:p-8 space-y-6">
+            <div className="p-6 md:p-8 space-y-5">
               <div className="text-center space-y-1.5">
                 <h2 className="text-xl md:text-2xl font-black text-slate-900">
-                  인접국 <span className="text-rose-600">{CONFLICT_NAME}</span>이 동맹국{' '}
-                  <span className="text-[#0F766E]">{ALLY_NAME}</span>을 침공했습니다!
+                  군사 강국 <span className="text-rose-600">{CONFLICT_NAME}</span>이 우리 동맹국{' '}
+                  <span className="text-[#0F766E]">{ALLY_NAME}</span>을 전격 침공했습니다!
                 </h2>
                 <p className="text-xs md:text-sm text-slate-600">
                   대통령님, 두 국가의 상반된 요구 앞에서 어떤 결정을 내리시겠습니까?
+                </p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 leading-relaxed space-y-1.5">
+                <div className="font-black text-slate-900">
+                  📌 현재 국제 정세 및 {groupData?.country?.name}과의 관계
+                </div>
+                <p>
+                  • <b>{groupData?.country?.name} ↔ {ALLY_NAME} (상호방위조약 동맹):</b> 과거 위기 때 {ALLY_NAME}이 우리를 구해준 혈맹으로, 침공 시 군사·물자를 지원하기로 조약이 맺어져 있습니다.
+                </p>
+                <p>
+                  • <b>{CONFLICT_NAME} ↔ {TRADE_NAME} (긴밀한 우방·자원 파트너):</b> {CONFLICT_NAME}이 {ALLY_NAME}을 침공하자, {CONFLICT_NAME}의 우방인 에너지 강대국 <b>{TRADE_NAME}</b>이 “{ALLY_NAME}을 도우면 {CONFLICT_NAME}을 적대하는 것으로 간주해, 너희 나라로 가는 천연가스·광물(65%)을 즉시 끊겠다”고 압박하고 있습니다.
                 </p>
               </div>
 
@@ -731,7 +727,7 @@ function JoinContent() {
           </div>
         )}
 
-        {/* S3.5: 국가안보회의(회의장) 배경 위 AI 외교 자문위원 2왕복 토론 */}
+        {/* S3.5: 국가안보회의 배경 위 AI 외교 자문위원 2왕복 토론 */}
         {currentStep === 'S3.5' && groupData?.rebuttal && (
           <div className="space-y-4">
             <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white shadow-lg">
@@ -1092,7 +1088,7 @@ function JoinContent() {
           </div>
         )}
 
-        {/* S6: 광해군 비교 (단순화) 및 최종 리포트 */}
+        {/* S6: 광해군 비교 및 최종 리포트 */}
         {(currentStep === 'S6' || currentStep === 'DONE') && (
           <div className="space-y-6">
             {currentStep === 'DONE' ? (

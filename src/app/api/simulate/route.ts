@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { adminDb } from '@/app/lib/firebaseAdmin';
 import {
+  DEFAULT_SESSION_ID,
   FALLBACK_REBUTTALS,
   FALLBACK_SIMULATIONS,
   WORLD_ACTORS,
@@ -67,7 +68,8 @@ export async function POST(req: Request) {
     const db = adminDb();
     const { action, code, groupId, payload } = await req.json();
 
-    const sessionRef = db.collection('sessions').doc(code);
+    const sessionId = code || DEFAULT_SESSION_ID;
+    const sessionRef = db.collection('sessions').doc(sessionId);
     const groupRef = sessionRef.collection('groups').doc(String(groupId));
     const [sessionSnap, groupSnap] = await Promise.all([sessionRef.get(), groupRef.get()]);
 
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
     const fallbackMode = sessionData.teacherSettings?.fallbackMode || false;
     const textModel = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
-    // --- 1. S3.5: 1차 AI 개별 맞춤 반론 생성 ---
+    // --- 1. S3.5: 1차 AI 외교 자문위원 개별 맞춤 반론 생성 ---
     if (action === 'GENERATE_REBUTTAL') {
       const { policy, reason, theory, preTest } = payload;
 
@@ -106,7 +108,8 @@ export async function POST(req: Request) {
         try {
           const prompt = `
 당신은 가상 국가 [${countryName}] 대통령을 보좌하는 AI 외교 자문위원입니다.
-현재 국제 정세는 인접국 [${CONFLICT_NAME}]이 오랜 안보 동맹국 [${ALLY_NAME}]을 침공했고, 자원 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
+현재 국제 정세는 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
+구체적으로 [${countryName}]과 [${ALLY_NAME}]는 상호방위조약으로 묶인 안보 동맹국이며, [${CONFLICT_NAME}]이 [${ALLY_NAME}]을 전격 침공하자 [${CONFLICT_NAME}]의 우방인 에너지·자원 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}]을 도울 경우 [${countryName}]에 대한 천연가스·핵심 광물(65%) 공급을 즉시 중단하겠다고 압박하고 있습니다.
 대통령(학생 모둠)이 선택한 정책은 "${policy}"이며, 직접 작성한 근거는 다음과 같습니다:
 ▶ 학생 작성 근거: "${reason}"
 ▶ 선택한 윤리 기준: ${theory}
@@ -175,7 +178,7 @@ export async function POST(req: Request) {
         try {
           const prompt = `
 당신은 가상 국가 [${countryName}] 대통령을 보좌하는 AI 외교 자문위원입니다.
-현재 국제 정세는 인접국 [${CONFLICT_NAME}]이 동맹국 [${ALLY_NAME}]을 침공하고 자원국 [${TRADE_NAME}]이 에너지 차단을 경고한 상황입니다.
+현재 국제 정세는 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
 지금까지 대통령(학생 모둠)과 나눈 외교 검토 대화는 다음과 같습니다:
 - 국가명: ${countryName}
 - 선택한 정책: "${policy}"
@@ -234,6 +237,7 @@ export async function POST(req: Request) {
           const prompt = `
 당신은 공영방송 국제뉴스 보도국입니다.
 가상 국가 [${countryName}]의 대통령이 두 차례의 AI 외교 자문위원 토론 끝에 최종적으로 "${finalPolicy}" 정책을 확정 발표했습니다.
+- 배경 정세: 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
 - 국가명: ${countryName} (절대로 대한민국, 한국, 북한 등 실제 현실 국가명을 쓰지 말고 반드시 [${countryName}]으로만 지칭하십시오)
 - 관련 국가: 동맹국 [${ALLY_NAME}], 에너지 자원국 [${TRADE_NAME}], 침공국 [${CONFLICT_NAME}] (절대로 프렌디아, 그랜, 카스벨이라는 옛 이름을 쓰지 마십시오)
 - 대통령의 최종 확정 근거: "${finalReason}"

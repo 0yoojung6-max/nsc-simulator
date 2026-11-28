@@ -24,31 +24,23 @@ export const WORLD_ACTORS = {
 export const ROLE_CARDS = [
   {
     id: 'president',
-    icon: '🎖️',
     title: '대통령',
-    focus: '나라의 결정',
-    prompt: '“여러 입장을 듣고 우리 나라가 어떤 선택을 할지 결정합니다.”',
+    image: '/role-president.png',
   },
   {
     id: 'entrepreneur',
-    icon: '🏭',
     title: '기업가',
-    focus: '공장과 무역',
-    prompt: '“핵심 광물이 끊기면 공장이 멈추고, 약속을 어기면 다른 나라와의 무역도 어려워집니다.”',
+    image: '/role-entrepreneur.png',
   },
   {
     id: 'merchant',
-    icon: '🏪',
     title: '소상공인',
-    focus: '가게와 생활비',
-    prompt: '“가스가 끊겨 전기·난방비와 물가가 오르면 동네 가게와 살림살이가 힘들어집니다.”',
+    image: '/role-merchant.png',
   },
   {
     id: 'activist',
-    icon: '🚑',
     title: '구호단체 활동가',
-    focus: '약속과 피해자',
-    prompt: '“어려울 때 도와주기로 한 약속과 전쟁으로 고통받는 사람들의 삶을 외면할 수 없습니다.”',
+    image: '/role-activist.png',
   },
 ];
 

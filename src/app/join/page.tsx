@@ -479,7 +479,7 @@ function JoinContent() {
           </div>
         )}
 
-        {/* 2단계(S2+S3 통합): 위기 상황 + 4인 역할 + 첫 선택 */}
+        {/* 2단계(S2+S3 통합): 위기 상황 + 4인 역할 이미지 카드 + 첫 선택 */}
         {currentStep === 'S2_S3' && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
@@ -513,7 +513,7 @@ function JoinContent() {
                 </div>
               </div>
 
-              <div className="p-5 md:p-6 space-y-4">
+              <div className="p-5 md:p-6 space-y-5">
                 <h2 className="text-lg md:text-xl font-black text-slate-900 text-center">
                   군사력이 강한 <span className="text-rose-600">{CONFLICT_NAME}</span>이 동맹국{' '}
                   <span className="text-[#0F766E]">{ALLY_NAME}</span>을 공격했습니다!
@@ -528,24 +528,25 @@ function JoinContent() {
                   </p>
                 </div>
 
-                {/* 4인 역할 나누기 */}
-                <div className="space-y-2 pt-1">
-                  <span className="block text-xs font-black text-slate-900">
-                    🎭 모둠원 역할 나누기 (네 가지 역할을 하나씩 맡아 자기 입장에서 먼저 이야기해 보세요)
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* 역할 나누기 (이미지 카드 4장) */}
+                <div className="space-y-2.5 pt-1">
+                  <span className="block text-sm font-black text-slate-900">역할 나누기</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {ROLE_CARDS.map((role) => (
                       <div
                         key={role.id}
-                        className="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-1"
+                        className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-black text-sm text-slate-900">
-                            {role.icon} {role.title}
-                          </span>
-                          <span className="text-[11px] font-bold text-[#0F766E]">{role.focus}</span>
+                        <div className="aspect-[4/3] w-full bg-slate-100 overflow-hidden">
+                          <img
+                            src={role.image}
+                            alt={role.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
                         </div>
-                        <p className="text-xs text-slate-600 leading-snug">{role.prompt}</p>
+                        <div className="py-2.5 px-2 text-center font-black text-sm text-slate-900">
+                          {role.title}
+                        </div>
                       </div>
                     ))}
                   </div>

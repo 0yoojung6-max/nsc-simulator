@@ -80,11 +80,11 @@ export async function POST(req: Request) {
     const sessionData = sessionSnap.data()!;
     const groupData = groupSnap.data()!;
 
-    const countryName = groupData.country?.name || groupData.draft?.countryName || '우리나라';
+    const countryName = groupData.country?.name || groupData.draft?.countryName || '우리 나라';
     const fallbackMode = sessionData.teacherSettings?.fallbackMode || false;
     const textModel = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
-    // --- 1. S3.5: 1차 AI 외교 자문위원 개별 맞춤 반론 생성 ---
+    // --- 1. 첫 번째 AI 외교 자문위원 반론 ---
     if (action === 'GENERATE_REBUTTAL') {
       const { policy, reason, theory, preTest } = payload;
 
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       if (isBlockedCountryName(reason)) {
         return NextResponse.json(
           {
-            error: `이유에 실제 국가명(한국, 미국, 중국, 러시아 등)이 포함되어 있습니다. 가상 이름(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})만 사용해 주세요.`,
+            error: `이유에 실제 나라 이름(한국, 미국, 중국, 러시아 등)이 들어 있습니다. 가상 이름(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})만 사용해 주세요.`,
           },
           { status: 400 }
         );
@@ -107,19 +107,22 @@ export async function POST(req: Request) {
       if (!fallbackMode && process.env.GEMINI_API_KEY) {
         try {
           const prompt = `
-당신은 가상 국가 [${countryName}] 대통령을 보좌하는 AI 외교 자문위원입니다.
-현재 국제 정세는 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
-구체적으로 [${countryName}]과 [${ALLY_NAME}]는 상호방위조약으로 묶인 안보 동맹국이며, [${CONFLICT_NAME}]이 [${ALLY_NAME}]을 전격 침공하자 [${CONFLICT_NAME}]의 우방인 에너지·자원 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}]을 도울 경우 [${countryName}]에 대한 천연가스·핵심 광물(65%) 공급을 즉시 중단하겠다고 압박하고 있습니다.
-대통령(학생 모둠)이 선택한 정책은 "${policy}"이며, 직접 작성한 근거는 다음과 같습니다:
-▶ 학생 작성 근거: "${reason}"
-▶ 선택한 윤리 기준: ${theory}
+당신은 가상 나라 [${countryName}]의 외교 결정을 돕는 AI 외교 자문위원입니다.
+현재 상황:
+- [${countryName}]과 [${ALLY_NAME}]은 서로 공격을 받으면 돕기로 약속한 오랜 동맹국입니다.
+- 군사력이 강한 [${CONFLICT_NAME}]이 [${ALLY_NAME}]을 공격했습니다.
+- [${CONFLICT_NAME}]과 가까운 자원 나라 [${TRADE_NAME}]은 "[${ALLY_NAME}]을 도우면 [${countryName}]에 보내는 천연가스와 핵심 광물(65%)을 끊겠다"고 압박하고 있습니다.
+- 모둠(대통령·기업가·소상공인·구호단체 역할)이 고른 방법: "${policy}"
+- 모둠이 적은 이유: "${reason}"
+- 선택의 성격: ${theory}
 
 [작성 규칙]
-1. 만약 학생의 근거("${reason}")가 위 외교 위기 상황(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})과 전혀 무관한 딴소리이거나 성의 없는 장난성 문장이라면, 억지로 외교 논리로 포장하지 말고 반론에 "현재 위기 상황과 무관하거나 내용이 불충분합니다. 이전 단계 또는 다시 작성하여 구체적인 외교적 근거를 제시해 주십시오."라고 정중히 안내하십시오.
-2. 정상적인 근거라면 교과서적 일반론이 아니라, 반드시 학생이 적은 근거("${reason}") 속 핵심 표현이나 논리를 직접 언급하며 현실적 부작용이나 논리적 허점을 찌르십시오.
-3. 학생이 공리주의(실리·민생) 논리를 폈다면 의무론(동맹 신의·보편 원칙) 관점에서, 의무론(조약·의리) 논리를 폈다면 공리주의(국민 에너지·경제 피해) 관점에서 반론하십시오.
-4. 정중한 표준 경어체("~하십시오", "~입니까?")를 사용하고, 반론은 2문장(95자 이내), 질문은 1문장(60자 이내)으로 작성하십시오.
-5. JSON만 출력: {"rebuttal": "...", "question": "..."}
+1. 문체는 반말이나 가벼운 말투가 아니라, 중학교 사회·도덕 교과서처럼 단정하고 이해하기 쉬운 표준 존댓말("~합니다", "~입니까?")을 사용하십시오. 어려운 한자어나 과장된 표현은 쓰지 마십시오.
+2. 만약 학생의 이유("${reason}")가 위 상황(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})과 전혀 상관없는 딴소리이거나 성의 없는 장난이라면, 반론에 "현재 상황과 맞지 않거나 내용이 부족합니다. 이전 단계로 돌아가 구체적인 이유를 다시 적어 주십시오."라고 안내하십시오.
+3. 정상적인 이유라면 학생이 적은 말("${reason}") 속 핵심 내용을 직접 언급하면서, 그 선택으로 생길 현실적인 문제나 놓친 점을 짚어 주십시오.
+4. 학생이 생활과 이익(공리주의)을 앞세웠다면 동맹 약속과 사람 목숨(의무론) 쪽에서 반론하고, 약속과 생명을 앞세웠다면 가스 차단과 가게·공장 피해(공리주의) 쪽에서 반론하십시오.
+5. 반론은 2문장(95자 이내), 질문은 1문장(60자 이내)으로 짧고 분명하게 작성하십시오.
+6. JSON만 출력: {"rebuttal": "...", "question": "..."}
           `;
           const response = await ai.models.generateContent({ model: textModel, contents: prompt });
           const cleaned = (response.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
@@ -147,7 +150,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, rebuttal: rebuttalResult });
     }
 
-    // --- 2. S3.6: 대통령 재반박에 대한 2차 최종 반론 생성 ---
+    // --- 2. 두 번째 AI 외교 자문위원 반론 ---
     if (action === 'GENERATE_FINAL_REBUTTAL') {
       const { rebuttalReply } = payload;
 
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
       if (isBlockedCountryName(rebuttalReply)) {
         return NextResponse.json(
           {
-            error: `재반박 내용에 실제 국가명이 포함되어 있습니다. 가상 이름(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})만 사용해 주세요.`,
+            error: `답변에 실제 나라 이름이 들어 있습니다. 가상 이름(${ALLY_NAME}, ${TRADE_NAME}, ${CONFLICT_NAME})만 사용해 주세요.`,
           },
           { status: 400 }
         );
@@ -170,28 +173,29 @@ export async function POST(req: Request) {
       const firstQuestion = groupData.rebuttal?.question || '';
 
       let secondRebuttal = {
-        rebuttal: `대통령님의 "${rebuttalReply}"라는 입장은 이해합니다만, 그 선택이 불러올 최악의 시나리오까지 감당할 수 있을지 마지막으로 점검해야 합니다.`,
-        question: '국민과 국제사회 앞에서 이 결정의 모든 결과를 책임질 최종 준비가 되셨습니까?',
+        rebuttal: `모둠에서 "${rebuttalReply}"라고 답한 뜻은 알겠지만, 그 선택 때문에 생길 가장 큰 어려움도 끝까지 감당할 수 있어야 합니다.`,
+        question: '국민과 다른 나라들 앞에서 이 결정의 결과를 책임질 준비가 되어 있습니까?',
       };
 
       if (!fallbackMode && process.env.GEMINI_API_KEY) {
         try {
           const prompt = `
-당신은 가상 국가 [${countryName}] 대통령을 보좌하는 AI 외교 자문위원입니다.
-현재 국제 정세는 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
-지금까지 대통령(학생 모둠)과 나눈 외교 검토 대화는 다음과 같습니다:
-- 국가명: ${countryName}
-- 선택한 정책: "${policy}"
-- 초기 근거: "${reason}"
-- AI 외교 자문위원의 1차 질문: "${firstQuestion}"
-- 대통령의 재반박: "${rebuttalReply}"
+당신은 가상 나라 [${countryName}]의 외교 결정을 돕는 AI 외교 자문위원입니다.
+현재 상황:
+- 공격한 나라 [${CONFLICT_NAME}]과 가까운 자원 나라 [${TRADE_NAME}]이 동맹국 [${ALLY_NAME}] 지원 시 천연가스와 광물(65%) 공급을 끊겠다고 경고한 상황입니다.
+- 나라 이름: ${countryName}
+- 고른 방법: "${policy}"
+- 처음 이유: "${reason}"
+- AI 자문위원의 첫 번째 질문: "${firstQuestion}"
+- 모둠의 답변: "${rebuttalReply}"
 
-[작성 규칙 - 마지막 2차 반론]
-1. 만약 대통령의 재반박("${rebuttalReply}")이 외교 위기와 전혀 상관없는 딴소리이거나 무의미한 장난이라면, 억지로 이어가지 말고 "상황과 무관한 답변입니다. 대통령으로서 외교적 판단 근거를 다시 명확히 밝혀 주십시오."라고 정중히 지적하십시오.
-2. 정상적인 답변이라면 대통령의 재반박("${rebuttalReply}")을 먼저 한 줄로 정확히 짚어 인정한 뒤, 그 재반박마저 안고 있는 마지막 딜레마를 날카롭지만 정중하게 지적하십시오.
-3. 학생이 모둠원들과 최종 결정을 내리기 직전 마지막으로 고민해 볼 핵심 질문을 1문장으로 던지십시오.
-4. 정중한 표준 경어체("~하십시오", "~입니까?")를 사용하고, 반론은 2문장(100자 이내), 질문은 1문장(60자 이내)으로 작성하십시오.
-5. JSON만 출력: {"rebuttal": "...", "question": "..."}
+[작성 규칙 - 마지막 두 번째 반론]
+1. 중학교 사회·도덕 교과서처럼 쉽고 분명한 표준 존댓말("~합니다", "~입니까?")을 사용하십시오. 어려운 한자어나 추상적인 표현은 쓰지 마십시오.
+2. 만약 모둠의 답변("${rebuttalReply}")이 상황과 전혀 무관한 딴소리이거나 장난이라면, "상황과 맞지 않는 답변입니다. 외교 선택에 대한 이유를 다시 분명하게 적어 주십시오."라고 지적하십시오.
+3. 정상적인 답변이라면 모둠의 답변("${rebuttalReply}")을 먼저 한 문장으로 받아 준 뒤, 그 답변에도 여전히 남아 있는 현실적 어려움을 한 가지 더 짚어 주십시오.
+4. 모둠원(대통령·기업가·소상공인·구호단체 역할)이 최종 결정을 내리기 전에 마지막으로 생각해 볼 질문을 1문장으로 던지십시오.
+5. 반론은 2문장(100자 이내), 질문은 1문장(60자 이내)으로 작성하십시오.
+6. JSON만 출력: {"rebuttal": "...", "question": "..."}
           `;
           const response = await ai.models.generateContent({ model: textModel, contents: prompt });
           const cleaned = (response.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
@@ -217,7 +221,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, finalRebuttal: secondRebuttal });
     }
 
-    // --- 3. S3.6 최종 결정 -> S4 맞춤형 뉴스 시뮬레이션 ---
+    // --- 3. 최종 결정 -> 맞춤형 뉴스 특보 ---
     if (action === 'RUN_SIMULATION') {
       const { keepOrRevise, finalPolicy, finalReason } = payload;
 
@@ -236,22 +240,22 @@ export async function POST(req: Request) {
         try {
           const prompt = `
 당신은 공영방송 국제뉴스 보도국입니다.
-가상 국가 [${countryName}]의 대통령이 두 차례의 AI 외교 자문위원 토론 끝에 최종적으로 "${finalPolicy}" 정책을 확정 발표했습니다.
-- 배경 정세: 침공국 [${CONFLICT_NAME}]과 우방 관계인 에너지 강대국 [${TRADE_NAME}]이 [${ALLY_NAME}] 지원 시 천연가스·광물 차단을 경고한 위기 상황입니다.
-- 국가명: ${countryName} (절대로 대한민국, 한국, 북한 등 실제 현실 국가명을 쓰지 말고 반드시 [${countryName}]으로만 지칭하십시오)
-- 관련 국가: 동맹국 [${ALLY_NAME}], 에너지 자원국 [${TRADE_NAME}], 침공국 [${CONFLICT_NAME}] (절대로 프렌디아, 그랜, 카스벨이라는 옛 이름을 쓰지 마십시오)
-- 대통령의 최종 확정 근거: "${finalReason}"
+가상 나라 [${countryName}]이 두 차례의 검토 끝에 최종적으로 "${finalPolicy}" 방법을 선택해 발표했습니다.
+- 상황: 공격한 나라 [${CONFLICT_NAME}]과 가까운 자원 나라 [${TRADE_NAME}]이 동맹국 [${ALLY_NAME}] 지원 시 천연가스와 광물 차단을 경고한 위기입니다.
+- 나라 이름: ${countryName} (절대로 한국, 대한민국, 북한 등 실제 나라 이름을 쓰지 말고 반드시 [${countryName}]으로만 쓰십시오)
+- 관련 나라: 동맹국 [${ALLY_NAME}], 자원 나라 [${TRADE_NAME}], 공격한 나라 [${CONFLICT_NAME}]
+- 최종 선택 이유: "${finalReason}"
 
-위 내용을 반영해 직후 벌어지는 국제 반응과 국내 상황을 뉴스 속보 3장면으로 작성하십시오.
+위 내용을 바탕으로 발표 직후의 국제 반응과 국내 상황을 뉴스 속보 3장면으로 작성하십시오.
 
 [규칙]
-1. 뉴스 내용 전체에서 [${countryName}], [${ALLY_NAME}], [${TRADE_NAME}], [${CONFLICT_NAME}] 국가명을 정확히 사용하십시오.
-2. 긍정적 성과(득)와 현실적 대가(실)의 균형을 맞추고, 각 항목의 text/body는 1~2문장(80자 이내)으로 명료하게 작성하십시오.
-3. 정중한 보도 어조("~했습니다")를 사용하고 JSON만 출력하십시오:
+1. 중학교 교과서나 학생 뉴스처럼 이해하기 쉬운 표준 보도 문장("~했습니다")을 사용하고 어려운 한자어는 피하십시오.
+2. 긍정적인 결과(얻은 점)와 부정적인 결과(잃은 점)가 모두 드러나게 쓰고, 각 항목의 text/body는 1~2문장(80자 이내)으로 짧게 작성하십시오.
+3. JSON만 출력하십시오:
 {
-  "ally_statement": {"speaker": "${ALLY_NAME} 외무부 성명", "text": "80자 이내 핵심 반응"},
+  "ally_statement": {"speaker": "${ALLY_NAME} 외무부 발표", "text": "80자 이내 핵심 반응"},
   "trade_response": {"speaker": "${TRADE_NAME} 에너지부 발표", "text": "80자 이내 핵심 조치"},
-  "news_article": {"headline": "38자 이내 뉴스 헤드라인", "body": "80자 이내 국내 여론", "source": "KBC 긴급특보"},
+  "news_article": {"headline": "38자 이내 뉴스 제목", "body": "80자 이내 국내 상황", "source": "KBC 긴급특보"},
   "ticker": ["한 줄 속보 요약"]
 }
           `;
